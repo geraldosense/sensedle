@@ -1,9 +1,18 @@
-import type { FamilyMember, FreePlaySession, GameState, StoredProgress } from '../types/game';
+import type { FamilyMember, FreePlaySession, GameState, GameMode, StoredProgress } from '../types/game';
 import { getTodayDateString } from './daily';
-import { pickRandomMember } from './freePlay';
+import {
+  WIN_COOLDOWN_MS,
+  getRequiredModesForCycle,
+  isGlobalCooldownActive,
+  isModeCycleComplete,
+  normalizeModeCycle,
+} from './cooldown';
+import { createEmptyModeRotation, pickNextSecretMember } from './freePlay';
+import { getMembersWithQuotes } from '../data/quotes';
+import type { ModeRotationState } from '../types/game';
 
 const STORAGE_KEY = 'familia-sense-progress';
-const SESSION_KEY = 'familia-sense-session';
+const LEGACY_SESSION_KEY = 'familia-sense-session';
 
 const DEFAULT_PROGRESS: StoredProgress = {
   streak: 0,
@@ -15,6 +24,30 @@ const DEFAULT_PROGRESS: StoredProgress = {
   totalWins: 0,
   totalGames: 0,
 };
+
+function sessionKey(mode: GameMode): string {
+  return `familia-sense-session-${mode}`;
+}
+
+function migrateLegacySession(): void {
+  try {
+    const legacy = localStorage.getItem(LEGACY_SESSION_KEY);
+    if (!legacy || localStorage.getItem(sessionKey('classic'))) return;
+
+    const parsed = JSON.parse(legacy) as Partial<FreePlaySession>;
+    const migrated: FreePlaySession = {
+      mode: 'classic',
+      secretMemberId: parsed.secretMemberId ?? '',
+      gameNumber: parsed.gameNumber ?? 1,
+      game: parsed.game ?? createEmptyGame(),
+    };
+
+    localStorage.setItem(sessionKey('classic'), JSON.stringify(migrated));
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+  } catch {
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+  }
+}
 
 export function loadProgress(): StoredProgress {
   try {
@@ -39,32 +72,99 @@ export function createEmptyGame(): GameState {
   };
 }
 
-export function loadFreePlaySession(): FreePlaySession | null {
+export function loadFreePlaySession(mode: GameMode): FreePlaySession | null {
+  migrateLegacySession();
+
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = localStorage.getItem(sessionKey(mode));
     if (!raw) return null;
-    return JSON.parse(raw) as FreePlaySession;
+
+    const parsed = JSON.parse(raw) as Partial<FreePlaySession>;
+    return {
+      mode,
+      secretMemberId: parsed.secretMemberId ?? '',
+      gameNumber: parsed.gameNumber ?? 1,
+      game: parsed.game ?? createEmptyGame(),
+    };
   } catch {
     return null;
   }
 }
 
 export function saveFreePlaySession(session: FreePlaySession): void {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  localStorage.setItem(sessionKey(session.mode), JSON.stringify(session));
+}
+
+export function getModeRotation(mode: GameMode): ModeRotationState {
+  const progress = loadProgress();
+  return progress.modeRotations?.[mode] ?? createEmptyModeRotation();
+}
+
+export function saveModeRotation(mode: GameMode, rotation: ModeRotationState): void {
+  const progress = loadProgress();
+  progress.modeRotations = {
+    ...progress.modeRotations,
+    [mode]: rotation,
+  };
+  saveProgress(progress);
+}
+
+export function resetModeRotations(): void {
+  const progress = loadProgress();
+  delete progress.modeRotations;
+  saveProgress(progress);
 }
 
 export function createNewFreePlaySession(
   members: FamilyMember[],
-  excludeMemberId?: string,
+  mode: GameMode,
 ): FreePlaySession {
   const progress = loadProgress();
-  const member = pickRandomMember(members, excludeMemberId);
+  const pool = mode === 'quote' ? getMembersWithQuotes(members) : members;
+  const currentRotation = progress.modeRotations?.[mode] ?? createEmptyModeRotation();
+  const { member, rotation } = pickNextSecretMember(pool, currentRotation);
+
+  saveModeRotation(mode, rotation);
 
   return {
+    mode,
     secretMemberId: member?.id ?? '',
     gameNumber: progress.totalGames + 1,
     game: createEmptyGame(),
   };
+}
+
+export function recordModeCycleWin(
+  mode: GameMode,
+  quoteMemberCount: number,
+): StoredProgress {
+  const progress = loadProgress();
+  const cycle = normalizeModeCycle(progress.modeCycle);
+  const requiredModes = getRequiredModesForCycle(quoteMemberCount);
+
+  if (!requiredModes.includes(mode)) {
+    return progress;
+  }
+
+  cycle[mode] = true;
+
+  if (isModeCycleComplete(cycle, requiredModes)) {
+    cycle.cooldownUntil = Date.now() + WIN_COOLDOWN_MS;
+  }
+
+  progress.modeCycle = cycle;
+  saveProgress(progress);
+  return progress;
+}
+
+export function getModeCycleProgress(): ReturnType<typeof normalizeModeCycle> {
+  const progress = loadProgress();
+  return normalizeModeCycle(progress.modeCycle);
+}
+
+export function isPlayBlockedByGlobalCooldown(): boolean {
+  const progress = loadProgress();
+  return isGlobalCooldownActive(progress.modeCycle);
 }
 
 export function recordFreePlayCompletion(
@@ -90,20 +190,30 @@ export function recordFreePlayCompletion(
 
 export function initFreePlaySession(
   members: FamilyMember[],
+  mode: GameMode,
 ): FreePlaySession {
-  const saved = loadFreePlaySession();
+  const pool = mode === 'quote' ? getMembersWithQuotes(members) : members;
+  const saved = loadFreePlaySession(mode);
+
+  if (isPlayBlockedByGlobalCooldown()) {
+    if (saved) return saved;
+  }
+
   const inProgress = saved && !saved.game.won && !saved.game.revealed;
 
-  if (inProgress) {
+  if (inProgress && pool.some((member) => member.id === saved.secretMemberId)) {
     return saved;
   }
 
-  const fresh = createNewFreePlaySession(members, saved?.secretMemberId);
+  const fresh = createNewFreePlaySession(members, mode);
   saveFreePlaySession(fresh);
   return fresh;
 }
 
 export function resetAllProgress(): void {
   localStorage.removeItem(STORAGE_KEY);
-  localStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(LEGACY_SESSION_KEY);
+  localStorage.removeItem(sessionKey('classic'));
+  localStorage.removeItem(sessionKey('silhouette'));
+  localStorage.removeItem(sessionKey('quote'));
 }

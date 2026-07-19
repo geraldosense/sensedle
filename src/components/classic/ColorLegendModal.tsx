@@ -1,14 +1,8 @@
+import { COLOR_LEGEND_ITEMS } from './colorLegendItems';
+
 interface ColorLegendModalProps {
   onClose: () => void;
 }
-
-const LEGEND_ITEMS = [
-  { status: 'correct', label: 'Correto', arrow: null },
-  { status: 'partial', label: 'Parcial', arrow: null },
-  { status: 'wrong', label: 'Incorreto', arrow: null },
-  { status: 'wrong', label: 'Depois de', arrow: 'up' as const },
-  { status: 'wrong', label: 'Antes de', arrow: 'down' as const },
-];
 
 export function ColorLegendModal({ onClose }: ColorLegendModalProps) {
   return (
@@ -24,7 +18,7 @@ export function ColorLegendModal({ onClose }: ColorLegendModalProps) {
         </h2>
 
         <ul className="color-legend-modal__list">
-          {LEGEND_ITEMS.map((item) => (
+          {COLOR_LEGEND_ITEMS.map((item) => (
             <li key={`${item.label}-${item.arrow ?? 'none'}`} className="color-legend-modal__item">
               <span
                 className={`color-legend-modal__swatch guess-cell guess-cell--classic guess-cell--${item.status}`}

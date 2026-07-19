@@ -1,63 +1,86 @@
+import { useEffect, useState } from 'react';
 import {
   BackgroundScene,
   HomeFooter,
   HomeLogo,
-  ModeButton,
 } from '../components/home/HomeLayout';
+import { GameModeButtonList } from '../components/game/GameModeVisuals';
+import { RoundCompleteCooldown } from '../components/classic/RoundCooldown';
 import { HowToPlay } from '../components/WinModal';
+import { getModeCycleProgress } from '../lib/storage';
+import { normalizeModeCycle } from '../lib/cooldown';
+import { useGlobalCooldown } from '../lib/useWinCooldown';
+import type { GameMode, ModeCycleProgress } from '../types/game';
 
 interface HomePageProps {
   onPlayClassic: () => void;
+  onPlaySilhouette: () => void;
+  onPlayQuote: () => void;
   onShowHowTo?: () => void;
 }
 
-export function HomePage({ onPlayClassic, onShowHowTo }: HomePageProps) {
+export function HomePage({ onPlayClassic, onPlaySilhouette, onPlayQuote, onShowHowTo }: HomePageProps) {
   return (
-    <HomePageContent onPlayClassic={onPlayClassic} onShowHowTo={onShowHowTo} />
+    <HomePageContent
+      onPlayClassic={onPlayClassic}
+      onPlaySilhouette={onPlaySilhouette}
+      onPlayQuote={onPlayQuote}
+      onShowHowTo={onShowHowTo}
+    />
   );
 }
 
-function HomePageContent({ onPlayClassic, onShowHowTo }: HomePageProps) {
+const MODE_HANDLERS: Record<'classic' | 'silhouette' | 'quote', (props: HomePageProps) => void> = {
+  classic: (p) => p.onPlayClassic(),
+  silhouette: (p) => p.onPlaySilhouette(),
+  quote: (p) => p.onPlayQuote(),
+};
+
+function HomePageContent(props: HomePageProps) {
+  const [modeCycle, setModeCycle] = useState<ModeCycleProgress>(() => getModeCycleProgress());
+  const globalCooldownRemainingMs = useGlobalCooldown(modeCycle);
+  const globalCooldownActive = globalCooldownRemainingMs > 0;
+
+  useEffect(() => {
+    if (!modeCycle.cooldownUntil) return;
+
+    const normalized = normalizeModeCycle(modeCycle);
+    if (!normalized.cooldownUntil) {
+      setModeCycle(normalized);
+    }
+  }, [globalCooldownRemainingMs, modeCycle]);
+
+  function handleSelectMode(mode: GameMode) {
+    MODE_HANDLERS[mode](props);
+  }
+
   return (
-    <div className="home-page">
+    <div className={`home-page ${globalCooldownActive ? 'home-page--round-locked' : ''}`}>
       <BackgroundScene />
 
       <div className="home-page__content">
         <header className="home-page__header">
-          <HomeLogo onSettingsClick={onShowHowTo} />
+          <HomeLogo onSettingsClick={props.onShowHowTo} />
           <h2 className="home-page__tagline">
             ADIVINHA OS MEMBROS DA <span className="text-sense-orange">FAMÍLIA</span>
           </h2>
         </header>
 
         <nav className="home-page__modes" aria-label="Modos de jogo">
-          <ModeButton
-            icon={<span className="text-xl font-black text-white">?</span>}
-            iconBg="bg-[#3b82c4]"
-            title="Clássico"
-            description="Consiga pistas a cada tentativa"
-            onClick={onPlayClassic}
-          />
-          <ModeButton
-            icon={<SilhouetteIcon />}
-            iconBg="bg-[#4ade80]"
-            title="Silhueta"
-            description="Adivinha com a silhueta do membro"
-            disabled
-          />
-          <ModeButton
-            icon={<QuoteIcon />}
-            iconBg="bg-[#eab308]"
-            title="Frases"
-            description="Adivinha com uma frase típica"
-            disabled
-          />
-          <ModeButton
-            icon={<EyeIcon />}
-            iconBg="bg-[#ef4444]"
-            title="Memória"
-            description="Adivinha com uma foto especial"
-            disabled
+          {globalCooldownActive && (
+            <RoundCompleteCooldown
+              remainingMs={globalCooldownRemainingMs}
+              className="round-cooldown--home"
+            />
+          )}
+          <GameModeButtonList
+            onSelect={handleSelectMode}
+            disabled={globalCooldownActive}
+            completedModes={{
+              classic: modeCycle.classic,
+              silhouette: modeCycle.silhouette,
+              quote: modeCycle.quote,
+            }}
           />
         </nav>
 
@@ -69,40 +92,21 @@ function HomePageContent({ onPlayClassic, onShowHowTo }: HomePageProps) {
 
 export function HomePageWithHowTo({
   onPlayClassic,
+  onPlaySilhouette,
+  onPlayQuote,
   onShowHowTo,
   showHowTo,
   onCloseHowTo,
 }: HomePageProps & { showHowTo: boolean; onCloseHowTo: () => void }) {
   return (
     <>
-      <HomePageContent onPlayClassic={onPlayClassic} onShowHowTo={onShowHowTo} />
+      <HomePageContent
+        onPlayClassic={onPlayClassic}
+        onPlaySilhouette={onPlaySilhouette}
+        onPlayQuote={onPlayQuote}
+        onShowHowTo={onShowHowTo}
+      />
       {showHowTo && <HowToPlay onClose={onCloseHowTo} />}
     </>
-  );
-}
-
-function SilhouetteIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
-      <circle cx="12" cy="8" r="4" />
-      <path d="M12 14c-4 0-7 2-7 4v2h14v-2c0-2-3-4-7-4z" />
-    </svg>
-  );
-}
-
-function QuoteIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="white">
-      <path d="M6 17h3l2-4V7H5v6h3zm8 0h3l2-4V7h-6v6h3z" />
-    </svg>
-  );
-}
-
-function EyeIcon() {
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-      <circle cx="12" cy="12" r="3" fill="white" />
-    </svg>
   );
 }

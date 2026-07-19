@@ -1,23 +1,107 @@
 import type { CellResult, ColumnDef, FamilyMember } from '../types/game';
 import { COLUMN_DEFS } from '../types/game';
 
-function compareSingle(guess: string, answer: string): CellResult['status'] {
-  if (!guess && !answer) return 'neutral';
-  if (guess.toLowerCase() === answer.toLowerCase()) return 'correct';
+const EXACT_ONLY_KEYS = new Set(['name', 'gender']);
+
+const STOP_WORDS = new Set([
+  'de',
+  'da',
+  'do',
+  'das',
+  'dos',
+  'e',
+  'ou',
+  'com',
+  'na',
+  'no',
+  'em',
+  'a',
+  'o',
+  'as',
+  'os',
+  'um',
+  'uma',
+]);
+
+function normalizeText(value: string): string {
+  return value
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function collectTexts(value: string | string[]): string[] {
+  if (Array.isArray(value)) {
+    return value.map(String).filter(Boolean);
+  }
+  return [String(value)].filter(Boolean);
+}
+
+function extractWords(texts: string[]): Set<string> {
+  const words = new Set<string>();
+
+  for (const text of texts) {
+    for (const word of normalizeText(text).split(/[^a-z0-9]+/)) {
+      if (word.length >= 2 && !STOP_WORDS.has(word)) {
+        words.add(word);
+      }
+    }
+  }
+
+  return words;
+}
+
+function compareExact(guess: string, answer: string): CellResult['status'] {
+  const normalizedGuess = normalizeText(guess);
+  const normalizedAnswer = normalizeText(answer);
+
+  if (!normalizedGuess && !normalizedAnswer) return 'neutral';
+  if (normalizedGuess === normalizedAnswer) return 'correct';
   return 'wrong';
 }
 
-function compareMulti(guess: string[], answer: string[]): CellResult['status'] {
-  const gSet = new Set(guess.map((s) => s.toLowerCase()));
-  const aSet = new Set(answer.map((s) => s.toLowerCase()));
-  if (gSet.size === 0 && aSet.size === 0) return 'neutral';
-  const intersection = [...gSet].filter((x) => aSet.has(x));
-  if (intersection.length === gSet.size && intersection.length === aSet.size) return 'correct';
-  if (intersection.length > 0) return 'partial';
+function compareCharacteristic(
+  guess: string | string[],
+  answer: string | string[],
+): CellResult['status'] {
+  const guessTexts = collectTexts(guess).map(normalizeText).filter(Boolean);
+  const answerTexts = collectTexts(answer).map(normalizeText).filter(Boolean);
+
+  if (guessTexts.length === 0 && answerTexts.length === 0) return 'neutral';
+  if (guessTexts.length === 0 || answerTexts.length === 0) return 'wrong';
+
+  const guessSet = new Set(guessTexts);
+  const answerSet = new Set(answerTexts);
+
+  const allGuessMatch = guessTexts.every((text) => answerSet.has(text));
+  const allAnswerMatch = answerTexts.every((text) => guessSet.has(text));
+
+  if (allGuessMatch && allAnswerMatch) {
+    return 'correct';
+  }
+
+  const sharedPhrases = guessTexts.filter((text) => answerSet.has(text));
+  if (sharedPhrases.length > 0) {
+    return 'partial';
+  }
+
+  const guessWords = extractWords(guessTexts);
+  const answerWords = extractWords(answerTexts);
+  const hasSharedWord = [...guessWords].some((word) => answerWords.has(word));
+
+  if (hasSharedWord) {
+    return 'partial';
+  }
+
   return 'wrong';
 }
 
-function compareOrdered(guess: number, answer: number): { status: CellResult['status']; arrow: CellResult['arrow'] } {
+function compareOrdered(
+  guess: number,
+  answer: number,
+): { status: CellResult['status']; arrow: CellResult['arrow'] } {
   if (guess === answer) return { status: 'correct', arrow: null };
   return {
     status: 'wrong',
@@ -48,12 +132,14 @@ export function compareGuess(guess: FamilyMember, answer: FamilyMember): CellRes
     const display = formatDisplay(col, guess);
 
     if (col.type === 'single') {
-      const status = compareSingle(String(guessVal), String(answerVal));
+      const status = EXACT_ONLY_KEYS.has(String(col.key))
+        ? compareExact(String(guessVal), String(answerVal))
+        : compareCharacteristic(String(guessVal), String(answerVal));
       return { status, display, arrow: null };
     }
 
     if (col.type === 'multi') {
-      const status = compareMulti(
+      const status = compareCharacteristic(
         guessVal as string[],
         answerVal as string[],
       );
@@ -66,5 +152,5 @@ export function compareGuess(guess: FamilyMember, answer: FamilyMember): CellRes
 }
 
 export function isWin(cells: CellResult[]): boolean {
-  return cells.every((c) => c.status === 'correct' || c.status === 'neutral');
+  return cells.every((cell) => cell.status === 'correct' || cell.status === 'neutral');
 }

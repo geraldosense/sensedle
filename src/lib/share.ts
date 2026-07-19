@@ -1,4 +1,5 @@
-import type { CellResult, GuessResult } from '../types/game';
+import type { CellResult, GuessResult, GameMode } from '../types/game';
+import { GAME_MODE_LABELS } from '../types/game';
 
 const STATUS_EMOJI: Record<CellResult['status'], string> = {
   correct: '🟩',
@@ -16,18 +17,29 @@ export function generateShareText(
   won: boolean,
   streak: number,
   gameNumber: number,
+  mode: GameMode = 'classic',
 ): string {
   const attemptLine = won ? `${guesses.length}` : 'X';
+  const modeLabel = GAME_MODE_LABELS[mode];
+
+  if (mode === 'quote') {
+    return [
+      `Família Sense ${modeLabel} #${gameNumber} ${won ? attemptLine : 'X'}`,
+      streak > 0 ? `🔥 Sequência: ${streak}` : '',
+      '',
+      `familiasense.pt/${mode}`,
+    ].filter(Boolean).join('\n');
+  }
 
   const grid = guesses.map((g) => rowToEmoji(g.cells)).join('\n');
 
   return [
-    `Família Sense #${gameNumber} ${won ? attemptLine : 'X'}`,
+    `Família Sense ${modeLabel} #${gameNumber} ${won ? attemptLine : 'X'}`,
     streak > 0 ? `🔥 Sequência: ${streak}` : '',
     '',
     grid,
     '',
-    `familiasense.pt/classic`,
+    `familiasense.pt/${mode}`,
   ].filter(Boolean).join('\n');
 }
 

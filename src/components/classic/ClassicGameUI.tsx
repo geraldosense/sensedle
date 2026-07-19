@@ -1,5 +1,8 @@
-import type { ReactNode, CSSProperties } from 'react';
+import type { ReactNode } from 'react';
+import type { GameMode } from '../../types/game';
 import { FamiliaSenseLogo } from '../home/FamiliaSenseLogo';
+import { AnimatedStreakFlame } from './AnimatedStreakFlame';
+import { GameModeTabBar } from '../game/GameModeVisuals';
 
 interface ClassicTopBarProps {
   onBack: () => void;
@@ -29,28 +32,19 @@ export function ClassicTopBar({ onBack, onShowHowTo }: ClassicTopBarProps) {
   );
 }
 
-export function ClassicModeTabs() {
-  const modes = [
-    { id: 'classic', icon: '?', active: true, color: '#3b82c4' },
-    { id: 'silhouette', icon: '👤', active: false, color: '#4ade80' },
-    { id: 'quote', icon: '❝', active: false, color: '#eab308' },
-    { id: 'memory', icon: '👁', active: false, color: '#ef4444' },
-  ];
+type PlayableMode = Extract<GameMode, 'classic' | 'silhouette' | 'quote'>;
 
+interface ClassicModeTabsProps {
+  activeMode: GameMode;
+  onModeChange: (mode: GameMode) => void;
+  disabled?: boolean;
+  completedModes?: Partial<Record<PlayableMode, boolean>>;
+}
+
+export function ClassicModeTabs(props: ClassicModeTabsProps) {
   return (
     <div className="classic-mode-tabs">
-      {modes.map((mode) => (
-        <button
-          key={mode.id}
-          type="button"
-          disabled={!mode.active}
-          className={`classic-mode-tabs__btn ${mode.active ? 'classic-mode-tabs__btn--active' : ''}`}
-          style={{ '--tab-color': mode.color } as CSSProperties}
-          aria-label={mode.id}
-        >
-          <span className="classic-mode-tabs__icon">{mode.icon}</span>
-        </button>
-      ))}
+      <GameModeTabBar {...props} />
     </div>
   );
 }
@@ -58,85 +52,61 @@ export function ClassicModeTabs() {
 interface ClassicUtilityBarProps {
   streak: number;
   guessCount: number;
-  won: boolean;
-  onNewGame: () => void;
   onShowStats: () => void;
   onShowHowTo: () => void;
-  onShowColorLegend: () => void;
 }
 
 export function ClassicUtilityBar({
   streak,
   guessCount,
-  won,
-  onNewGame,
   onShowStats,
   onShowHowTo,
-  onShowColorLegend,
 }: ClassicUtilityBarProps) {
   return (
     <div className="classic-utility-bar">
-      <button type="button" className="classic-utility-bar__btn" onClick={onShowStats} aria-label="Estatísticas">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M3 3v18h18M7 16l4-4 4 4 4-6" />
+      <button
+        type="button"
+        className="classic-utility-bar__item classic-utility-bar__item--action"
+        onClick={onShowStats}
+        aria-label="Estatísticas"
+        title="Estatísticas"
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <rect x="4" y="12" width="4" height="8" rx="1" />
+          <rect x="10" y="8" width="4" height="12" rx="1" />
+          <rect x="16" y="4" width="4" height="16" rx="1" />
         </svg>
       </button>
 
-      <UtilityIcon label="Sequência" title={`Sequência: ${streak}`}>
-        <span className="text-base">🔥</span>
-        <span className="classic-utility-bar__value">{streak}</span>
-      </UtilityIcon>
+      <div className="classic-utility-bar__item classic-utility-bar__item--streak" title={`Sequência: ${streak}`} aria-label={`Sequência: ${streak}`}>
+        <AnimatedStreakFlame />
+        <span className="classic-utility-bar__flame-value">{streak}</span>
+      </div>
 
-      <UtilityIcon label="Tentativas" title={`${guessCount} tentativas`}>
-        <span className="text-base">📋</span>
-        {guessCount > 0 && <span className="classic-utility-bar__badge">{guessCount}</span>}
-      </UtilityIcon>
-
-      <UtilityIcon label="Estado" title={won ? 'Resolvido!' : 'Em jogo'}>
-        <span className="text-base">{won ? '✅' : '❓'}</span>
-      </UtilityIcon>
+      <div className="classic-utility-bar__item classic-utility-bar__item--clipboard" title={`${guessCount} tentativas`} aria-label={`${guessCount} tentativas`}>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2" />
+          <rect x="9" y="3" width="6" height="4" rx="1" />
+          <path d="M9 12h6M9 16h6" />
+        </svg>
+        {guessCount > 0 && (
+          <span className="classic-utility-bar__badge">{guessCount}</span>
+        )}
+      </div>
 
       <button
         type="button"
-        className="classic-utility-bar__btn classic-utility-bar__btn--new-game"
-        onClick={onNewGame}
-        aria-label="Novo jogo"
-        title="Novo jogo"
+        className="classic-utility-bar__item classic-utility-bar__item--action"
+        onClick={onShowHowTo}
+        aria-label="Como jogar"
+        title="Como jogar"
       >
-        <span className="classic-utility-bar__new-game-label">Novo</span>
-      </button>
-
-      <button type="button" className="classic-utility-bar__btn" onClick={onShowColorLegend} aria-label="Indicadores de cor">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="3" width="7" height="7" rx="1" fill="#538d4e" stroke="none" />
-          <rect x="14" y="3" width="7" height="7" rx="1" fill="#b59f3b" stroke="none" />
-          <rect x="3" y="14" width="7" height="7" rx="1" fill="#8b3a3a" stroke="none" />
-          <rect x="14" y="14" width="7" height="7" rx="1" fill="#8b3a3a" stroke="none" />
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M9.5 9.5a2.6 2.6 0 1 1 4.2 2c-.8.6-1.2 1.1-1.2 2.1V15" />
+          <circle cx="12" cy="18" r="0.8" fill="currentColor" stroke="none" />
         </svg>
       </button>
-
-      <button type="button" className="classic-utility-bar__btn" onClick={onShowHowTo} aria-label="Como jogar">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" />
-        </svg>
-      </button>
-    </div>
-  );
-}
-
-function UtilityIcon({
-  children,
-  label,
-  title,
-}: {
-  children: ReactNode;
-  label: string;
-  title?: string;
-}) {
-  return (
-    <div className="classic-utility-bar__btn" title={title} aria-label={label}>
-      {children}
     </div>
   );
 }
@@ -144,24 +114,45 @@ function UtilityIcon({
 interface ClassicScrollProps {
   children: ReactNode;
   showIntro: boolean;
+  mode: GameMode;
 }
 
-export function ClassicScroll({ children, showIntro }: ClassicScrollProps) {
+const SCROLL_COPY: Record<GameMode, { title: string; intro: string; note: string }> = {
+  classic: {
+    title: 'ADIVINHA QUAL É O MEMBRO DA FAMÍLIA!',
+    intro: 'Escreve um membro qualquer para começar.',
+    note: 'Família Sense — todos os membros da casa.',
+  },
+  silhouette: {
+    title: 'ADIVINHA QUEM É PELA IMAGEM!',
+    intro: 'Escreve um membro para começar.',
+    note: 'Família Sense — adivinha pela silhueta.',
+  },
+  quote: {
+    title: 'QUEM DISSE ISTO?',
+    intro: 'Escreve um membro qualquer para começar.',
+    note: 'Família Sense — todos os membros da casa.',
+  },
+};
+
+export function ClassicScroll({ children, showIntro, mode }: ClassicScrollProps) {
+  const copy = SCROLL_COPY[mode];
+
   return (
     <div className="classic-scroll">
       <div className="classic-scroll__roller classic-scroll__roller--top" aria-hidden="true" />
       <div className="classic-scroll__paper">
         <div className="classic-scroll__intro">
           <h2 className="classic-scroll__title">
-            ADIVINHA QUAL É O MEMBRO DA FAMÍLIA!
+            {copy.title}
           </h2>
           {showIntro && (
             <p className="classic-scroll__subtitle">
-              Escreve um membro qualquer para começar.
+              {copy.intro}
             </p>
           )}
           <p className="classic-scroll__note">
-            Família Sense — todos os membros da casa.
+            {copy.note}
           </p>
         </div>
         <div className="classic-scroll__content">{children}</div>
@@ -174,8 +165,13 @@ export function ClassicScroll({ children, showIntro }: ClassicScrollProps) {
 export function ClassicSkyBackground() {
   return (
     <div className="classic-sky-bg" aria-hidden="true">
-      <div className="classic-sky-bg__clouds" />
-      <div className="classic-sky-bg__rocks" />
+      <img
+        src="/images/family-background.png"
+        alt=""
+        className="classic-sky-bg__photo"
+        decoding="async"
+      />
+      <div className="classic-sky-bg__overlay" />
     </div>
   );
 }

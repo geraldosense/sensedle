@@ -64,11 +64,11 @@ export function HomeLogo({ onSettingsClick }: HomeLogoProps) {
 
       <div
         className="home-logo-bar__icon home-logo-bar__icon--right text-2xl"
-        title="Português"
+        title="Angola"
         role="img"
-        aria-label="Português"
+        aria-label="Angola"
       >
-        🇵🇹
+        🇦🇴
       </div>
     </div>
   );

@@ -2,6 +2,19 @@ export type CellStatus = 'correct' | 'partial' | 'wrong' | 'neutral';
 
 export type ArrowDirection = 'up' | 'down' | null;
 
+export type GameMode = 'classic' | 'silhouette' | 'quote';
+
+export const GAME_MODE_LABELS: Record<GameMode, string> = {
+  classic: 'Clássico',
+  silhouette: 'Silhueta',
+  quote: 'Frases',
+};
+
+export interface MemberQuote {
+  /** Frase completa — visível desde o primeiro momento. */
+  text: string;
+}
+
 export interface FamilyMember {
   id: string;
   name: string;
@@ -20,6 +33,8 @@ export interface FamilyMember {
   ageLabel?: string;
   favoriteColor: string;
   favoriteRoom: string;
+  /** Só presente quando a família adicionou uma frase real em `data/quotes.ts`. */
+  quote?: MemberQuote;
 }
 
 export interface ColumnDef {
@@ -50,9 +65,24 @@ export interface GameState {
 }
 
 export interface FreePlaySession {
+  mode: GameMode;
   secretMemberId: string;
   gameNumber: number;
   game: GameState;
+}
+
+export interface ModeCycleProgress {
+  classic: boolean;
+  silhouette: boolean;
+  quote: boolean;
+  cooldownUntil: number | null;
+}
+
+export interface ModeRotationState {
+  /** Membros ainda por sortear neste ciclo (baralho embaralhado). */
+  queue: string[];
+  /** Último membro secreto — evita repetir imediatamente ao reembaralhar. */
+  lastSecretId: string | null;
 }
 
 export interface StoredProgress {
@@ -64,6 +94,9 @@ export interface StoredProgress {
   dailyAnswers: Record<string, string>;
   totalWins: number;
   totalGames: number;
+  modeCycle?: ModeCycleProgress;
+  /** Baralho por modo — evita repetir personagens/frases antes de esgotar o pool. */
+  modeRotations?: Partial<Record<GameMode, ModeRotationState>>;
 }
 
 export const ORDERED_RANKS: Record<string, number[]> = {

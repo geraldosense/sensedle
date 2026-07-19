@@ -126,17 +126,33 @@ interface GuessRowProps {
   memberName: string;
   memberImage?: string;
   animate?: boolean;
+  isWin?: boolean;
   theme?: 'default' | 'classic';
 }
 
-export function GuessRow({ cells, memberName, memberImage, animate, theme = 'default' }: GuessRowProps) {
+export function GuessRow({
+  cells,
+  memberName,
+  memberImage,
+  animate,
+  isWin = false,
+  theme = 'default',
+}: GuessRowProps) {
   const gridCols = theme === 'classic'
     ? CLASSIC_COLUMNS
     : `repeat(${COLUMN_DEFS.length}, minmax(72px, 1fr))`;
 
+  const rowClass = [
+    'guess-grid__row',
+    animate ? 'guess-grid__row--enter' : '',
+    isWin ? 'guess-grid__row--win' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
   return (
     <div
-      className={`guess-grid__row ${animate ? 'animate-fade-in' : ''}`}
+      className={rowClass}
       style={{ gridTemplateColumns: gridCols }}
     >
       {cells.map((cell, i) => (

@@ -1,4 +1,6 @@
 import type { FamilyMember } from '../types/game';
+import { RoundCompleteCooldown, RoundCycleProgress } from './classic/RoundCooldown';
+import { WinBanner, WinCelebration } from './classic/WinCelebration';
 
 interface WinModalProps {
   member: FamilyMember;
@@ -7,9 +9,13 @@ interface WinModalProps {
   gameNumber: number;
   onShare: () => void;
   onClose: () => void;
-  onPlayAgain: () => void;
+  onPlayAgain?: () => void;
   shared: boolean;
   revealed?: boolean;
+  modeLabel?: string;
+  cooldownRemainingMs?: number;
+  modesWonCount?: number;
+  requiredModesCount?: number;
 }
 
 export function WinModal({
@@ -22,22 +28,27 @@ export function WinModal({
   onPlayAgain,
   shared,
   revealed,
+  modeLabel,
+  cooldownRemainingMs = 0,
+  modesWonCount = 0,
+  requiredModesCount = 3,
 }: WinModalProps) {
   return (
-    <div className="classic-modal-overlay" role="presentation">
-      <div className="classic-modal classic-modal--win animate-fade-in" role="dialog">
+    <div className="classic-modal-overlay classic-modal-overlay--win" role="presentation">
+      <WinCelebration className="win-celebration--modal" />
+      <div className="classic-modal classic-modal--win animate-win-modal" role="dialog">
         <div className="classic-modal__win-header">
           {revealed ? (
             <p className="classic-modal__win-badge">Resposta revelada</p>
           ) : (
-            <p className="classic-modal__win-badge classic-modal__win-badge--success">
-              Parabéns! 🎉
-            </p>
+            <WinBanner label="Parabéns!" className="win-banner--modal" />
           )}
-          <p className="classic-modal__win-puzzle">Jogo #{gameNumber}</p>
+          <p className="classic-modal__win-puzzle">
+            {modeLabel ? `${modeLabel} · ` : ''}Jogo #{gameNumber}
+          </p>
         </div>
 
-        <div className="classic-modal__portrait">
+        <div className="classic-modal__portrait classic-modal__portrait--win">
           {member.image ? (
             <img src={member.image} alt={member.name} className="classic-modal__portrait-img" />
           ) : (
@@ -77,9 +88,27 @@ export function WinModal({
           <button type="button" onClick={onShare} className="classic-modal__btn classic-modal__btn--primary">
             {shared ? '✓ Copiado!' : 'Partilhar resultado'}
           </button>
-          <button type="button" onClick={onPlayAgain} className="classic-modal__btn classic-modal__btn--primary">
-            Jogar outra vez
-          </button>
+          {cooldownRemainingMs > 0 ? (
+            <RoundCompleteCooldown
+              remainingMs={cooldownRemainingMs}
+              className="round-cooldown--modal"
+            />
+          ) : (
+            <>
+              {modesWonCount > 0 && modesWonCount < requiredModesCount && (
+                <RoundCycleProgress
+                  modesWonCount={modesWonCount}
+                  requiredModesCount={requiredModesCount}
+                  className="mode-cycle-status--modal"
+                />
+              )}
+              {onPlayAgain && (
+                <button type="button" onClick={onPlayAgain} className="classic-modal__btn classic-modal__btn--primary">
+                  Jogar outra vez
+                </button>
+              )}
+            </>
+          )}
           <button type="button" onClick={onClose} className="classic-modal__btn">
             Fechar
           </button>
