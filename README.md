@@ -41,3 +41,4 @@ Edita `src/data/members.ts` e adiciona cada membro ao array `FAMILY_MEMBERS`:
 
 Coloca as imagens em `public/images/`.
 # sensedle
+# sensedle
